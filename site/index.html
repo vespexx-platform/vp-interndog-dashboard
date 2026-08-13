@@ -526,10 +526,17 @@ eyeBtn.addEventListener("click",()=>{
 const SKEY="dash_sess", SESS_TTL=60*60*1000;
 function saveSession(pw){ try{ localStorage.setItem(SKEY, JSON.stringify({pw, exp:Date.now()+SESS_TTL})); }catch(_){} }
 function readSession(){ try{ const s=JSON.parse(localStorage.getItem(SKEY)||"null"); if(s&&s.exp>Date.now()) return s.pw; localStorage.removeItem(SKEY); }catch(_){} return null; }
-function openDash(data){
+let AMZ=null, VOCDATA=null, amzRendered=false;
+async function openDash(data){
+  AMZ=data;
   document.getElementById("overlay").style.display="none";
-  document.getElementById("shell").style.display="grid";
-  render(data);
+  // VOC 데이터도 같은 비번으로 복호화 시도(있을 때만)
+  try{
+    const venc = await (window.__VOC_READY__||Promise.resolve(window.__VOC_ENC__));
+    const pw = readSession();
+    if(venc && pw) VOCDATA = await decrypt(venc, pw);
+  }catch(_){ VOCDATA=null; }
+  showChooser();
 }
 
 document.getElementById("gate").addEventListener("submit",async e=>{
@@ -543,6 +550,104 @@ document.getElementById("gate").addEventListener("submit",async e=>{
     openDash(data);
   }catch(_){ err.textContent="비밀번호가 올바르지 않습니다"; }
 });
+
+// ===== 비번 후 선택화면 + CS/VOC 대시보드 =====
+window.__VOC_READY__ = new Promise(res=>{
+  const s=document.createElement("script"); s.src="./voc.js?t="+Date.now();
+  s.onload=()=>res(window.__VOC_ENC__); s.onerror=()=>res(null); document.head.appendChild(s);
+});
+(function(){
+  const st=document.createElement("style");
+  st.textContent=`
+  #chooser{position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;gap:20px;z-index:19;flex-wrap:wrap}
+  .choice{background:var(--card);border:1px solid var(--border);border-radius:18px;width:260px;max-width:80vw;padding:28px;cursor:pointer;text-align:center;transition:.15s;color:var(--fg)}
+  .choice:hover{border-color:var(--primary);transform:translateY(-2px)}
+  .choice .ic{font-size:32px;margin-bottom:12px}.choice h3{margin:0 0 6px;font-size:16px}
+  .choice p{margin:0;color:var(--muted-fg);font-size:12.5px}
+  .choice.disabled{opacity:.45;cursor:not-allowed;pointer-events:none}
+  #csview{position:fixed;inset:0;background:#0d0e12;display:none;z-index:18}
+  #csbar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:12px;padding:10px 14px;z-index:3;background:linear-gradient(#0d0e12,rgba(13,14,18,0))}
+  #csbar b{font-size:14px;color:#e7eaf0}#csbar .s{color:#8b93a3;font-size:12px}
+  #csback{background:#16181f;border:1px solid #262a34;color:#cdd3dc;border-radius:8px;padding:6px 11px;cursor:pointer;font-size:12px}
+  #cstabs{margin-left:auto;display:flex;gap:3px;background:#16181f;border:1px solid #262a34;border-radius:9px;padding:3px}
+  #cstabs button{background:transparent;border:none;color:#8b93a3;font-size:12px;padding:5px 12px;border-radius:7px;cursor:pointer}
+  #cstabs button.on{background:#2a2f3a;color:#fff}#csCanvas{display:block}`;
+  document.head.appendChild(st);
+  document.body.insertAdjacentHTML("beforeend", `
+  <div id="chooser">
+    <div class="choice" onclick="__openAmz()"><div class="ic">📊</div><h3>아마존 판매 대시보드</h3><p>매출·트래픽·재고·인사이트</p></div>
+    <div class="choice" id="csChoice" onclick="__openCS()"><div class="ic">💬</div><h3>CS · VOC 대시보드</h3><p>고객문의 유형 그래프</p></div>
+  </div>
+  <div id="csview"><div id="csbar"><button id="csback" onclick="__backChooser()">← 선택</button>
+    <b>CS · VOC</b><span class="s" id="csSub"></span><div id="cstabs"></div></div>
+    <canvas id="csCanvas"></canvas></div>`);
+})();
+function showChooser(){
+  document.getElementById("shell").style.display="none";
+  document.getElementById("csview").style.display="none";
+  const cs=document.getElementById("csChoice");
+  if(!VOCDATA){cs.classList.add("disabled");cs.querySelector("p").textContent="데이터 없음";}
+  document.getElementById("chooser").style.display="flex";
+}
+function __openAmz(){
+  document.getElementById("chooser").style.display="none";
+  document.getElementById("shell").style.display="grid";
+  if(!amzRendered){ render(AMZ); amzRendered=true; }
+}
+function __backChooser(){ showChooser(); }
+function __openCS(){
+  if(!VOCDATA) return;
+  document.getElementById("chooser").style.display="none";
+  document.getElementById("csview").style.display="block";
+  renderVOC();
+}
+let vocCtl=null, vocInit=false, vocActiveProduct=null;
+function renderVOC(){
+  if(vocCtl){ vocCtl.resize(); return; }
+  const D=VOCDATA, cv=document.getElementById("csCanvas"), ctx=cv.getContext("2d");
+  document.getElementById("csSub").textContent=`실 VOC ${D.total.toLocaleString()}건 · 유형 ${D.cats.length}개`;
+  let W,H,DPR=devicePixelRatio||1,scale=0.6,ox=0,oy=0,drag=null,hoverCat=-1,didFit=false;
+  const EXTENT=470, catColor=i=>`hsl(220 6% ${52+(i%3)*7}%)`, catByName={};
+  D.cats.forEach((c,i)=>catByName[c.name]=i);
+  if(!vocInit){
+    const tn=['전체',...D.prods.map(p=>p.name)];
+    document.getElementById("cstabs").innerHTML=tn.map((t,i)=>`<button data-p="${t}" class="${i===0?'on':''}">${t}</button>`).join('');
+    document.querySelectorAll('#cstabs button').forEach(b=>b.addEventListener('click',()=>{
+      document.querySelectorAll('#cstabs button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+      vocActiveProduct=b.dataset.p==='전체'?null:b.dataset.p; draw();})); vocInit=true;
+  }
+  function fit(){scale=Math.min(W,H)*0.86/(2*EXTENT);ox=W/2;oy=H/2+18;}
+  function resize(){W=innerWidth;H=innerHeight;cv.width=W*DPR;cv.height=H*DPR;cv.style.width=W+'px';cv.style.height=H+'px';ctx.setTransform(DPR,0,0,DPR,0,0);if(!didFit&&W>0){fit();didFit=true;}draw();}
+  function draw(){
+    ctx.clearRect(0,0,W,H);ctx.save();ctx.translate(ox,oy);ctx.scale(scale,scale);const dim=hoverCat>=0;
+    ctx.lineWidth=0.6/scale;
+    for(const e of D.pc){const p=D.prods.find(x=>x.name===e.p),c=D.cats.find(x=>x.name===e.c);if(!p||!c)continue;
+      const on=!dim||catByName[e.c]===hoverCat;ctx.strokeStyle='rgba(150,158,172,'+(on?Math.min(.55,.1+e.w/500):.04)+')';
+      ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(c.x,c.y);ctx.stroke();}
+    for(const q of D.pts){if(vocActiveProduct&&q.p!==vocActiveProduct)continue;const on=!dim||q.c===hoverCat;
+      ctx.fillStyle=catColor(q.c);ctx.globalAlpha=on?.72:.05;ctx.beginPath();ctx.arc(q.x,q.y,on&&dim?2.6:2.1,0,6.283);ctx.fill();}
+    ctx.globalAlpha=1;
+    for(let i=0;i<D.cats.length;i++){const c=D.cats[i];const on=!dim||i===hoverCat;const r=5+9*Math.sqrt(c.count/D.cats[0].count);
+      ctx.globalAlpha=on?1:.2;ctx.fillStyle=i===hoverCat?'#fff':catColor(i);ctx.beginPath();ctx.arc(c.x,c.y,r,0,6.283);ctx.fill();
+      ctx.fillStyle='#e7eaf0';ctx.font='12px sans-serif';ctx.textAlign='center';if(scale>0.5||i===hoverCat)ctx.fillText(c.name,c.x,c.y-r-4);}
+    ctx.globalAlpha=1;
+    for(const p of D.prods){const r=8+14*Math.sqrt(p.count/D.prods[0].count);
+      ctx.fillStyle='#cdd3dc';ctx.globalAlpha=.9;ctx.beginPath();ctx.arc(p.x,p.y,r,0,6.283);ctx.fill();ctx.globalAlpha=1;
+      ctx.fillStyle='#fff';ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.fillText(p.name,p.x,p.y+r+13);}
+    ctx.restore();
+  }
+  cv.onwheel=e=>{e.preventDefault();const f=e.deltaY<0?1.12:0.89;const mx=e.clientX-ox,my=e.clientY-oy;ox-=mx*(f-1);oy-=my*(f-1);scale*=f;scale=Math.max(0.2,Math.min(6,scale));draw();};
+  cv.onpointerdown=e=>{drag={x:e.clientX,y:e.clientY};};
+  window.addEventListener('pointerup',()=>drag=null);
+  cv.onpointermove=e=>{
+    if(drag){ox+=e.clientX-drag.x;oy+=e.clientY-drag.y;drag={x:e.clientX,y:e.clientY};draw();return;}
+    const gx=(e.clientX-ox)/scale,gy=(e.clientY-oy)/scale;let nc=-1,best=95;
+    for(let i=0;i<D.cats.length;i++){const d=Math.hypot(gx-D.cats[i].x,gy-D.cats[i].y);if(d<best){best=d;nc=i;}}
+    if(nc!==hoverCat){hoverCat=nc;draw();}
+  };
+  window.addEventListener('resize',()=>{if(document.getElementById("csview").style.display!=="none"){didFit=false;resize();}});
+  vocCtl={resize,draw}; resize();
+}
 </script>
 <script>
 // data.js는 매 로드마다 캐시버스터로 받아온다(브라우저 캐시로 옛 데이터가 보이는 문제 방지)
