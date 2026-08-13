@@ -42,5 +42,5 @@ python -m http.server 8765 --directory site   # localhost = secure context(Web C
 
 ## 보안 메모
 - 공개 URL엔 **암호문만** 노출. 보안 강도는 `DASHBOARD_PASSWORD`에 의존 → **길고 무작위한 값 권장**.
-- 비번 변경 시 대시보드 레포 + `amazon-sales-report` 레포의 `DASHBOARD_PASSWORD`를 **동일하게** 바꾸고 각 워크플로 재실행.
+- 비번 변경 시 대시보드 레포 + `vp-interndog` 레포의 `DASHBOARD_PASSWORD`를 **동일하게** 바꾸고 각 워크플로 재실행.
 - `robots noindex`로 검색 노출 차단.

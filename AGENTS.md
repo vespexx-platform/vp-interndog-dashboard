@@ -18,7 +18,7 @@
 | 레포 | 공개 | 역할 |
 |---|---|---|
 | `vespexx-platform/vp-interndog-dashboard` (이 레포) | **PUBLIC** | 웹 대시보드(Pages) + 데이터 빌드/암호화/누적 |
-| `vespexx-platform/amazon-sales-report` | PRIVATE | Slack 일간·주간 리포트 발송 |
+| `vespexx-platform/vp-interndog` | PRIVATE | Slack 일간·주간 리포트 발송 |
 
 ## 4. 데이터 흐름
 ```
@@ -33,7 +33,7 @@
      │ Make API로 읽기(토큰)             │
      │                                  ▼
 [GitHub Actions + Python]  ─ 두 레포 각각의 워크플로가 store를 읽어 처리
-  · amazon-sales-report:  amazon_report.py  → Slack (chat.postMessage + 파일업로드)
+  · vp-interndog:  amazon_report.py  → Slack (chat.postMessage + 파일업로드)
   · vp-interndog-dashboard:     build_data.py     → 히스토리 병합/암호화 → site/data.js 커밋 → Pages 배포
 ```
 Make는 데이터 공급만. **집계·포맷·전송은 전부 Python**(과거 Make 수식으로 하려다 지옥을 봄, §9 참고).
@@ -58,7 +58,7 @@ Make는 데이터 공급만. **집계·포맷·전송은 전부 Python**(과거 
 - Secrets: `MAKE_API_TOKEN`, `MAKE_ZONE`, `MAKE_STORE_ID`, `DASHBOARD_PASSWORD`
 - `permissions: contents:write`(data.js 커밋백) + `pages:write` + `id-token:write`
 
-**amazon-sales-report** — `daily.yml`(cron `17 9 * * *`=18:17 KST), `weekly.yml`(cron `13 1 * * 1`=월 10:13 KST)
+**vp-interndog** — `daily.yml`(cron `17 9 * * *`=18:17 KST), `weekly.yml`(cron `13 1 * * 1`=월 10:13 KST)
 - Secrets: `MAKE_API_TOKEN`, `MAKE_ZONE`, `MAKE_STORE_ID`, `SLACK_BOT_TOKEN`, `SLACK_CHANNEL`, `SLACK_WEBHOOK_URL`, `DASHBOARD_PASSWORD`
 - Variables: `DASHBOARD_URL`, `SELLER_CENTRAL_URL`
 - 봇 앱 스코프: `chat:write`, `files:write`. 채널에 봇 초대돼 있어야 함.
@@ -79,7 +79,7 @@ vp-interndog-dashboard/
   site/index.html          대시보드 SPA (게이트/복호화/차트/뷰)
   site/data.js             암호화된 누적 히스토리(커밋됨, 영속)
   .github/workflows/deploy.yml
-amazon-sales-report/ (private)
+vp-interndog/ (private)
   amazon_report.py         store 읽기 → 집계 → Slack(daily|weekly)
   .github/workflows/{daily,weekly}.yml
 ```
