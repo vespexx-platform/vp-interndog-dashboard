@@ -665,8 +665,10 @@ function setupGraph(container, tabsEl, subEl, D){
 
 
 
-let vocCtl=null;
-function renderVOC(){ if(vocCtl){vocCtl.resize();return;} vocCtl=setupGraph(document.getElementById('csGraph'),document.getElementById('cstabs'),document.getElementById('csSub'),VOCDATA); }
+function renderVOC(){
+  const c=document.getElementById('csGraph'); c.innerHTML=''; document.getElementById('cstabs').innerHTML='';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>setupGraph(c, document.getElementById('cstabs'), document.getElementById('csSub'), VOCDATA)));
+}
 
 </script>
 <script>
