@@ -604,67 +604,107 @@ function __openCS(){
 
 function setupGraph(cv, tabsEl, subEl, D){
   const ctx=cv.getContext('2d');
-  const C={bg:'#f5f6f8',dot:'#aab0bb',cat:'#5b6472',catTx:'#2a3038',hub:'#39414d',hubTx:'#12161c',edge:'#d7dbe2',hl:'#0f1216'};
-  const tabs=D.prods.map(p=>p.name);
-  let active=tabs[0], layouts={}, W,H,DPR=devicePixelRatio||1,scale=0.7,ox=0,oy=0,drag=null,down=null,hoverCat=-1,didFit=false;
+  const C={bg:'#f5f6f8',dot:'#9aa1ad',cat:'#5b6472',catTx:'#2a3038',hub:'#39414d',hubTx:'#12161c',
+    lHub:'rgba(120,130,150,.35)',lCat:'rgba(150,158,172,.16)',lTk:'rgba(160,168,180,.08)',hl:'#0f1216'};
+  const tabs=D.prods.map(p=>p.name), R=x=>Math.random();
+  let active=tabs[0], W,H,DPR=devicePixelRatio||1,scale=0.9,ox=0,oy=0,didFit=false;
+  let nodes=[],links=[],hub=null,alpha=1,raf=null,dragNode=null,pan=null,down=null,hoverCat=-1;
   const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-  // 원문 패널(1회 생성)
   let panel=document.getElementById('tkPanel');
   if(!panel){const s2=document.createElement('style');s2.textContent=`#tkPanel{position:fixed;left:16px;bottom:16px;width:min(390px,86vw);max-height:46vh;overflow:auto;background:#fff;border:1px solid #e2e5ea;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.14);padding:14px 16px;z-index:9;display:none;font-size:13px;line-height:1.65;color:#1a1e24;white-space:pre-wrap}#tkPanel .h{font-size:11.5px;color:#6b7280;margin-bottom:7px}#tkPanel .x{position:absolute;top:7px;right:10px;cursor:pointer;color:#9aa1ad;font-size:17px;border:none;background:none;line-height:1}`;document.head.appendChild(s2);panel=document.createElement('div');panel.id='tkPanel';document.body.appendChild(panel);}
   function showPanel(tk){panel.innerHTML=`<button class=x>&times;</button><div class=h>${esc(tk.p)} · ${esc(D.cats[tk.c].name)}</div>${tk.t?esc(tk.t):'<i>원문 없음</i>'}`;panel.style.display='block';panel.querySelector('.x').onclick=()=>panel.style.display='none';}
-  function computeLayout(prod){
+
+  function build(prod){
+    nodes=[];links=[];hoverCat=-1;
     const tk=D.tickets.map((t,i)=>({...t,ti:i})).filter(t=>t.p===prod);
     const cc={}; for(const t of tk) cc[t.c]=(cc[t.c]||0)+1;
     const idxs=Object.keys(cc).map(Number).sort((a,b)=>cc[b]-cc[a]);
-    const N=idxs.length||1, Rc=330, catPos={};
-    idxs.forEach((ci,i)=>{const a=2*Math.PI*i/N-Math.PI/2;catPos[ci]={x:Rc*Math.cos(a),y:Rc*Math.sin(a),count:cc[ci],name:D.cats[ci].name,idx:ci};});
     const maxc=Math.max(1,...idxs.map(ci=>cc[ci]));
-    const pts=tk.map(t=>{const cp=catPos[t.c],rr=60*Math.sqrt(Math.random()),aa=2*Math.PI*Math.random();
-      return {x:cp.x+rr*Math.cos(aa),y:cp.y+rr*Math.sin(aa),c:t.c,ti:t.ti};});
-    return {cats:Object.values(catPos),pts,hub:{x:0,y:0,name:prod,count:tk.length},maxc};
+    hub={type:'hub',name:prod,count:tk.length,x:R()*30,y:R()*30,vx:0,vy:0}; nodes.push(hub);
+    const catN={};
+    idxs.forEach((ci,i)=>{const a=2*Math.PI*i/idxs.length,d=210;
+      const n={type:'cat',idx:ci,name:D.cats[ci].name,count:cc[ci],r:4+5*Math.sqrt(cc[ci]/maxc),
+        x:d*Math.cos(a)+R()*20,y:d*Math.sin(a)+R()*20,vx:0,vy:0};
+      catN[ci]=n;nodes.push(n);links.push({a:hub,b:n,len:150,k:0.025,kind:0});});
+    const byCat={};
+    for(const t of tk){const cn=catN[t.c],a=R()*6.283,rr=12+R()*18;
+      const n={type:'ticket',ti:t.ti,c:t.c,ang:a,x:cn.x+rr*Math.cos(a),y:cn.y+rr*Math.sin(a),vx:0,vy:0};
+      nodes.push(n);links.push({a:cn,b:n,len:16,k:0.13,kind:1});(byCat[t.c]=byCat[t.c]||[]).push(n);}
+    for(const ci in byCat){const arr=byCat[ci].sort((p,q)=>p.ang-q.ang);if(arr.length<2)continue;
+      for(let i=0;i<arr.length;i++){links.push({a:arr[i],b:arr[(i+1)%arr.length],len:14,k:0.03,kind:2});}}
+    alpha=1; if(!raf) loop();
   }
-  function L(){ if(!layouts[active]) layouts[active]=computeLayout(active); return layouts[active]; }
-  if(tabsEl){tabsEl.innerHTML=tabs.map((t,i)=>`<button data-p="${t}" class="${i===0?'on':''}">${t}</button>`).join('');
-    tabsEl.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
-      tabsEl.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
-      active=b.dataset.p;hoverCat=-1;draw();}));}
-  if(subEl)subEl.textContent=`실 VOC ${D.total.toLocaleString()}건 · 유형 ${D.cats.length}개 · 점 클릭=원문`;
-  const EXTENT=430;
-  function fit(){scale=Math.min(W,H)*0.86/(2*EXTENT);ox=W/2;oy=H/2+16;}
-  function resize(){W=innerWidth;H=innerHeight;cv.width=W*DPR;cv.height=H*DPR;cv.style.width=W+'px';cv.style.height=H+'px';ctx.setTransform(DPR,0,0,DPR,0,0);if(!didFit&&W>0){fit();didFit=true;}draw();}
+  function step(){
+    const cell=48,grid={};
+    for(const n of nodes){const k=Math.floor(n.x/cell)+','+Math.floor(n.y/cell);(grid[k]=grid[k]||[]).push(n);}
+    for(const n of nodes){const cx=Math.floor(n.x/cell),cy=Math.floor(n.y/cell);
+      for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++){const arr=grid[(cx+dx)+','+(cy+dy)];if(!arr)continue;
+        for(const m of arr){if(m===n)continue;let ddx=n.x-m.x,ddy=n.y-m.y,d2=ddx*ddx+ddy*ddy||0.01;
+          if(d2<9216){const bt=n.type==='ticket'&&m.type==='ticket',bc=n.type!=='ticket'&&m.type!=='ticket';
+            const f=(bt?14:bc?800:130)/d2,d=Math.sqrt(d2);
+            n.vx+=ddx/d*f*alpha;n.vy+=ddy/d*f*alpha;}}}}
+    for(const l of links){let dx=l.b.x-l.a.x,dy=l.b.y-l.a.y,d=Math.sqrt(dx*dx+dy*dy)||0.01,f=(d-l.len)*l.k*alpha,
+      fx=dx/d*f,fy=dy/d*f;l.a.vx+=fx;l.a.vy+=fy;l.b.vx-=fx;l.b.vy-=fy;}
+    hub.x=0;hub.y=0;hub.vx=0;hub.vy=0;  // 허브 원점 고정(전체 중앙 정렬 앵커)
+    for(const n of nodes){if(n===dragNode||n===hub)continue;n.vx+=(0-n.x)*0.004;n.vy+=(0-n.y)*0.004;
+      n.vx*=0.82;n.vy*=0.82;n.x+=n.vx;n.y+=n.vy;}
+    alpha*=0.985;
+  }
   function draw(){
-    const g=L();ctx.fillStyle=C.bg;ctx.fillRect(0,0,W,H);ctx.save();ctx.translate(ox,oy);ctx.scale(scale,scale);
+    ctx.fillStyle=C.bg;ctx.fillRect(0,0,W,H);ctx.save();ctx.translate(ox,oy);ctx.scale(scale,scale);
     const dim=hoverCat>=0;
-    ctx.lineWidth=0.6/scale;
-    for(const c of g.cats){const on=!dim||c.idx===hoverCat;ctx.strokeStyle=on?C.edge:'rgba(0,0,0,.03)';ctx.beginPath();ctx.moveTo(g.hub.x,g.hub.y);ctx.lineTo(c.x,c.y);ctx.stroke();}
-    for(const q of g.pts){const on=!dim||q.c===hoverCat;ctx.fillStyle=C.dot;ctx.globalAlpha=on?.7:.08;ctx.beginPath();ctx.arc(q.x,q.y,on&&dim?2:1.5,0,6.283);ctx.fill();}
+    ctx.lineWidth=0.7/scale;
+    for(const l of links){
+      // 줌 레벨별 링크 표시: 개요=허브선만, 확대할수록 티켓 링크·백링크 노출
+      if(l.kind===1 && scale<1.0) continue;
+      if(l.kind===2 && scale<1.5) continue;
+      const c=l.kind===2?C.lTk:l.kind===1?C.lCat:C.lHub;
+      if(dim){const ok=(l.a.idx===hoverCat||l.b.c===hoverCat||l.a.c===hoverCat||l.b.idx===hoverCat);if(!ok&&l.kind!==0)continue;}
+      ctx.strokeStyle=c;ctx.beginPath();ctx.moveTo(l.a.x,l.a.y);ctx.lineTo(l.b.x,l.b.y);ctx.stroke();}
+    for(const n of nodes){
+      if(n.type==='ticket'){const on=!dim||n.c===hoverCat;ctx.fillStyle=C.dot;ctx.globalAlpha=on?.8:.1;
+        ctx.beginPath();ctx.arc(n.x,n.y,on&&dim?2.8:2.3,0,6.283);ctx.fill();}
+    }
     ctx.globalAlpha=1;
-    for(const c of g.cats){const on=!dim||c.idx===hoverCat;const r=3.5+4.5*Math.sqrt(c.count/g.maxc);
-      ctx.globalAlpha=on?1:.25;ctx.fillStyle=c.idx===hoverCat?C.hl:C.cat;ctx.beginPath();ctx.arc(c.x,c.y,r,0,6.283);ctx.fill();
-      ctx.fillStyle=C.catTx;ctx.font='11.5px sans-serif';ctx.textAlign='center';if(scale>0.5||c.idx===hoverCat)ctx.fillText(c.name+' '+c.count,c.x,c.y-r-4);}
+    for(const n of nodes){if(n.type!=='cat')continue;const on=!dim||n.idx===hoverCat;
+      ctx.globalAlpha=on?1:.25;ctx.fillStyle=n.idx===hoverCat?C.hl:C.cat;ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,6.283);ctx.fill();
+      ctx.fillStyle=C.catTx;ctx.font='11.5px sans-serif';ctx.textAlign='center';
+      if(scale>0.55||n.idx===hoverCat)ctx.fillText(n.name+' '+n.count,n.x,n.y-n.r-4);}
     ctx.globalAlpha=1;
-    const h=g.hub;ctx.fillStyle=C.hub;ctx.beginPath();ctx.arc(h.x,h.y,8,0,6.283);ctx.fill();
-    ctx.fillStyle=C.hubTx;ctx.font='bold 12.5px sans-serif';ctx.textAlign='center';ctx.fillText(h.name+' '+h.count,h.x,h.y+22);
+    ctx.fillStyle=C.hub;ctx.beginPath();ctx.arc(hub.x,hub.y,8,0,6.283);ctx.fill();
+    ctx.fillStyle=C.hubTx;ctx.font='bold 12.5px sans-serif';ctx.textAlign='center';ctx.fillText(hub.name+' '+hub.count,hub.x,hub.y+22);
     ctx.restore();
   }
-  cv.onwheel=e=>{e.preventDefault();const f=e.deltaY<0?1.12:.89,mx=e.clientX-ox,my=e.clientY-oy;ox-=mx*(f-1);oy-=my*(f-1);scale*=f;scale=Math.max(.2,Math.min(6,scale));draw();};
-  cv.onpointerdown=e=>{drag={x:e.clientX,y:e.clientY};down={x:e.clientX,y:e.clientY};};
+  function loop(){step();draw();
+    if(alpha>0.02||dragNode){raf=requestAnimationFrame(loop);}else{raf=null;draw();}}
+  function reheat(a){alpha=Math.max(alpha,a);if(!raf)loop();}
+
+  if(tabsEl){tabsEl.innerHTML=tabs.map((t,i)=>`<button data-p="${t}" class="${i===0?'on':''}">${t}</button>`).join('');
+    tabsEl.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
+      tabsEl.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');active=b.dataset.p;build(active);}));}
+  if(subEl)subEl.textContent=`실 VOC ${D.total.toLocaleString()}건 · 유형 ${D.cats.length}개 · 노드 클릭=원문·드래그`;
+  const EXTENT=420;
+  function fit(){scale=Math.min(W,H)*0.86/(2*EXTENT);ox=W/2;oy=H/2+16;}
+  function resize(){W=innerWidth;H=innerHeight;cv.width=W*DPR;cv.height=H*DPR;cv.style.width=W+'px';cv.style.height=H+'px';ctx.setTransform(DPR,0,0,DPR,0,0);if(!didFit&&W>0){fit();didFit=true;}draw();}
+  function nearest(e,rad){const gx=(e.clientX-ox)/scale,gy=(e.clientY-oy)/scale;let best=rad,hit=null;
+    for(const n of nodes){const d=Math.hypot(gx-n.x,gy-n.y);if(d<best){best=d;hit=n;}}return {hit,gx,gy};}
+  cv.onwheel=e=>{e.preventDefault();const f=e.deltaY<0?1.12:.89,mx=e.clientX-ox,my=e.clientY-oy;ox-=mx*(f-1);oy-=my*(f-1);scale*=f;scale=Math.max(.2,Math.min(6,scale));if(!raf)draw();};
+  cv.onpointerdown=e=>{const {hit}=nearest(e,16);down={x:e.clientX,y:e.clientY};
+    if(hit){dragNode=hit;reheat(0.5);}else{pan={x:e.clientX,y:e.clientY};}};
+  cv.onpointermove=e=>{
+    if(dragNode){dragNode.x=(e.clientX-ox)/scale;dragNode.y=(e.clientY-oy)/scale;dragNode.vx=dragNode.vy=0;reheat(0.3);return;}
+    if(pan){ox+=e.clientX-pan.x;oy+=e.clientY-pan.y;pan={x:e.clientX,y:e.clientY};if(!raf)draw();return;}
+    const {hit}=nearest(e,14);const nc=hit&&hit.type==='cat'?hit.idx:(hit&&hit.type==='ticket'?hit.c:-1);
+    if(nc!==hoverCat){hoverCat=nc;if(!raf)draw();}};
   window.addEventListener('pointerup',e=>{
     if(down){const moved=Math.hypot(e.clientX-down.x,e.clientY-down.y);
-      if(moved<5){const g=L(),gx=(e.clientX-ox)/scale,gy=(e.clientY-oy)/scale;let best=9,hit=null;
-        for(const q of g.pts){const d=Math.hypot(gx-q.x,gy-q.y);if(d<best){best=d;hit=q;}}
-        if(hit)showPanel(D.tickets[hit.ti]);}
-      down=null;} drag=null;});
-  cv.onpointermove=e=>{
-    if(drag){ox+=e.clientX-drag.x;oy+=e.clientY-drag.y;drag={x:e.clientX,y:e.clientY};draw();return;}
-    const g=L(),gx=(e.clientX-ox)/scale,gy=(e.clientY-oy)/scale;let nc=-1,best=90;
-    for(const c of g.cats){const d=Math.hypot(gx-c.x,gy-c.y);if(d<best){best=d;nc=c.idx;}}
-    if(nc!==hoverCat){hoverCat=nc;draw();}
-  };
+      if(moved<5&&dragNode&&dragNode.type==='ticket')showPanel(D.tickets[dragNode.ti]);}
+    dragNode=null;pan=null;down=null;});
   window.addEventListener('resize',()=>{if(cv.offsetParent!==null){didFit=false;resize();}});
-  resize();
+  build(active); resize();
   return {resize};
 }
+
 
 
 let vocCtl=null;
