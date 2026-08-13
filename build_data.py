@@ -36,7 +36,7 @@ HISTORY_START = os.environ.get("HISTORY_START", "2026-05-01")  # 이 날짜부�
 def store_records():
     req = urllib.request.Request(
         f"https://{MAKE_ZONE}/api/v2/data-stores/{STORE_ID}/data?pg%5Blimit%5D=50",
-        headers={"Authorization": f"Token {MAKE_TOKEN}", "User-Agent": "amazon-dashboard/1.0"})
+        headers={"Authorization": f"Token {MAKE_TOKEN}", "User-Agent": "vp-interndog-dashboard/1.0"})
     with urllib.request.urlopen(req, timeout=60) as r:
         d = json.loads(r.read().decode())
     return {rec.get("key"): rec.get("data", {}).get("blob") for rec in d.get("records", [])}

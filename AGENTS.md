@@ -17,7 +17,7 @@
 ## 3. 두 개의 레포
 | 레포 | 공개 | 역할 |
 |---|---|---|
-| `vespexx-platform/amazon-dashboard` (이 레포) | **PUBLIC** | 웹 대시보드(Pages) + 데이터 빌드/암호화/누적 |
+| `vespexx-platform/vp-interndog-dashboard` (이 레포) | **PUBLIC** | 웹 대시보드(Pages) + 데이터 빌드/암호화/누적 |
 | `vespexx-platform/amazon-sales-report` | PRIVATE | Slack 일간·주간 리포트 발송 |
 
 ## 4. 데이터 흐름
@@ -34,7 +34,7 @@
      │                                  ▼
 [GitHub Actions + Python]  ─ 두 레포 각각의 워크플로가 store를 읽어 처리
   · amazon-sales-report:  amazon_report.py  → Slack (chat.postMessage + 파일업로드)
-  · amazon-dashboard:     build_data.py     → 히스토리 병합/암호화 → site/data.js 커밋 → Pages 배포
+  · vp-interndog-dashboard:     build_data.py     → 히스토리 병합/암호화 → site/data.js 커밋 → Pages 배포
 ```
 Make는 데이터 공급만. **집계·포맷·전송은 전부 Python**(과거 Make 수식으로 하려다 지옥을 봄, §9 참고).
 
@@ -54,7 +54,7 @@ Make는 데이터 공급만. **집계·포맷·전송은 전부 Python**(과거 
 - **store 정리 필요(선택)**: 'latest/inventory/listings' 외 옛 진단 키(`trend,fullbody,sums,fntest,raw,inv_raw`)가 남아있음. 무해하지만 삭제 가능.
 
 ## 6. GitHub Actions & 시크릿(이름만)
-**amazon-dashboard** — `.github/workflows/deploy.yml` (cron `22 9 * * *` = 18:22 KST, +commit-back)
+**vp-interndog-dashboard** — `.github/workflows/deploy.yml` (cron `22 9 * * *` = 18:22 KST, +commit-back)
 - Secrets: `MAKE_API_TOKEN`, `MAKE_ZONE`, `MAKE_STORE_ID`, `DASHBOARD_PASSWORD`
 - `permissions: contents:write`(data.js 커밋백) + `pages:write` + `id-token:write`
 
@@ -74,7 +74,7 @@ Make는 데이터 공급만. **집계·포맷·전송은 전부 Python**(과거 
 
 ## 8. 파일 구조
 ```
-amazon-dashboard/
+vp-interndog-dashboard/
   build_data.py            store 읽기 → 병합/암호화 → site/data.js
   site/index.html          대시보드 SPA (게이트/복호화/차트/뷰)
   site/data.js             암호화된 누적 히스토리(커밋됨, 영속)
