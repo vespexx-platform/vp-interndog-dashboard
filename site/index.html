@@ -6,6 +6,8 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Amazon 판매 대시보드</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-force"></script>
+<script src="https://cdn.jsdelivr.net/npm/force-graph"></script>
 <style>
   :root{
     --bg:#f6f7f8; --sidebar:#ffffff; --card:#ffffff; --fg:#111418; --muted:#f2f3f5;
@@ -571,7 +573,7 @@ window.__VOC_READY__ = new Promise(res=>{
   #csback{background:#fff;border:1px solid #e2e5ea;color:#374151;border-radius:8px;padding:6px 11px;cursor:pointer;font-size:12px}
   #cstabs{margin-left:auto;display:flex;gap:3px;background:#fff;border:1px solid #e2e5ea;border-radius:9px;padding:3px}
   #cstabs button{background:transparent;border:none;color:#6b7280;font-size:12px;padding:5px 12px;border-radius:7px;cursor:pointer}
-  #cstabs button.on{background:#e9ecf1;color:#111}#csCanvas{display:block}`;
+  #cstabs button.on{background:#e9ecf1;color:#111}#csGraph{position:absolute;inset:0}`;
   document.head.appendChild(st);
   document.body.insertAdjacentHTML("beforeend", `
   <div id="chooser">
@@ -580,7 +582,7 @@ window.__VOC_READY__ = new Promise(res=>{
   </div>
   <div id="csview"><div id="csbar"><button id="csback" onclick="__backChooser()">← 선택</button>
     <b>CS · VOC</b><span class="s" id="csSub"></span><div id="cstabs"></div></div>
-    <canvas id="csCanvas"></canvas></div>`);
+    <div id="csGraph" style="position:absolute;inset:0"></div></div>`);
 })();
 function showChooser(){
   document.getElementById("shell").style.display="none";
@@ -602,113 +604,68 @@ function __openCS(){
   renderVOC();
 }
 
-function setupGraph(cv, tabsEl, subEl, D){
-  const ctx=cv.getContext('2d');
-  const C={bg:'#f5f6f8',dot:'#9aa1ad',cat:'#5b6472',catTx:'#2a3038',hub:'#39414d',hubTx:'#12161c',
-    lHub:'rgba(120,130,150,.35)',lCat:'rgba(150,158,172,.16)',lTk:'rgba(160,168,180,.08)',hl:'#0f1216'};
-  const tabs=D.prods.map(p=>p.name), R=x=>Math.random();
-  let active=tabs[0], W,H,DPR=devicePixelRatio||1,scale=0.9,ox=0,oy=0,didFit=false;
-  let nodes=[],links=[],hub=null,alpha=1,raf=null,dragNode=null,pan=null,down=null,hoverCat=-1;
+function setupGraph(container, tabsEl, subEl, D){
+  const COL={hub:'#39414d',cat:'#5b6472',dot:'#9aa1ad'};
   const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   let panel=document.getElementById('tkPanel');
   if(!panel){const s2=document.createElement('style');s2.textContent=`#tkPanel{position:fixed;left:16px;bottom:16px;width:min(390px,86vw);max-height:46vh;overflow:auto;background:#fff;border:1px solid #e2e5ea;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.14);padding:14px 16px;z-index:9;display:none;font-size:13px;line-height:1.65;color:#1a1e24;white-space:pre-wrap}#tkPanel .h{font-size:11.5px;color:#6b7280;margin-bottom:7px}#tkPanel .x{position:absolute;top:7px;right:10px;cursor:pointer;color:#9aa1ad;font-size:17px;border:none;background:none;line-height:1}`;document.head.appendChild(s2);panel=document.createElement('div');panel.id='tkPanel';document.body.appendChild(panel);}
   function showPanel(tk){panel.innerHTML=`<button class=x>&times;</button><div class=h>${esc(tk.p)} · ${esc(D.cats[tk.c].name)}</div>${tk.t?esc(tk.t):'<i>원문 없음</i>'}`;panel.style.display='block';panel.querySelector('.x').onclick=()=>panel.style.display='none';}
 
-  function build(prod){
-    nodes=[];links=[];hoverCat=-1;
+  function buildData(prod){
     const tk=D.tickets.map((t,i)=>({...t,ti:i})).filter(t=>t.p===prod);
     const cc={}; for(const t of tk) cc[t.c]=(cc[t.c]||0)+1;
     const idxs=Object.keys(cc).map(Number).sort((a,b)=>cc[b]-cc[a]);
-    const maxc=Math.max(1,...idxs.map(ci=>cc[ci]));
-    hub={type:'hub',name:prod,count:tk.length,x:R()*30,y:R()*30,vx:0,vy:0}; nodes.push(hub);
-    const catN={};
-    idxs.forEach((ci,i)=>{const a=2*Math.PI*i/idxs.length,d=210;
-      const n={type:'cat',idx:ci,name:D.cats[ci].name,count:cc[ci],r:4+5*Math.sqrt(cc[ci]/maxc),
-        x:d*Math.cos(a)+R()*20,y:d*Math.sin(a)+R()*20,vx:0,vy:0};
-      catN[ci]=n;nodes.push(n);links.push({a:hub,b:n,len:150,k:0.025,kind:0});});
+    const maxc=Math.max(1,...idxs.map(ci=>cc[ci])), N=idxs.length, Rr=300;
+    // 허브·유형은 위치 고정(fx/fy) → charge가 티켓을 밀어내지 않음. 티켓만 자유.
+    const nodes=[{id:'hub',type:'hub',name:prod+' '+tk.length,val:18,fx:0,fy:0}], links=[];
+    const pos={};
+    idxs.forEach((ci,i)=>{const a=2*Math.PI*i/N-Math.PI/2,x=Rr*Math.cos(a),y=Rr*Math.sin(a);pos[ci]=[x,y];
+      nodes.push({id:'c'+ci,type:'cat',name:D.cats[ci].name+' '+cc[ci],val:3+8*Math.sqrt(cc[ci]/maxc),fx:x,fy:y});
+      links.push({source:'hub',target:'c'+ci,kind:0});});
     const byCat={};
-    for(const t of tk){const cn=catN[t.c],a=R()*6.283,rr=12+R()*18;
-      const n={type:'ticket',ti:t.ti,c:t.c,ang:a,x:cn.x+rr*Math.cos(a),y:cn.y+rr*Math.sin(a),vx:0,vy:0};
-      nodes.push(n);links.push({a:cn,b:n,len:16,k:0.13,kind:1});(byCat[t.c]=byCat[t.c]||[]).push(n);}
-    for(const ci in byCat){const arr=byCat[ci].sort((p,q)=>p.ang-q.ang);if(arr.length<2)continue;
-      for(let i=0;i<arr.length;i++){links.push({a:arr[i],b:arr[(i+1)%arr.length],len:14,k:0.03,kind:2});}}
-    alpha=1; if(!raf) loop();
+    tk.forEach(t=>{const id='t'+t.ti,p=pos[t.c],a=Math.random()*6.28,r=10+Math.random()*30;
+      nodes.push({id,type:'ticket',ti:t.ti,c:t.c,val:0.5,x:p[0]+r*Math.cos(a),y:p[1]+r*Math.sin(a)});
+      links.push({source:'c'+t.c,target:id,kind:1});(byCat[t.c]=byCat[t.c]||[]).push(id);});
+    for(const ci in byCat){const a=byCat[ci];for(let i=0;i+1<a.length;i++)links.push({source:a[i],target:a[i+1],kind:2});}
+    return {nodes,links};
   }
-  function step(){
-    const cell=48,grid={};
-    for(const n of nodes){const k=Math.floor(n.x/cell)+','+Math.floor(n.y/cell);(grid[k]=grid[k]||[]).push(n);}
-    for(const n of nodes){const cx=Math.floor(n.x/cell),cy=Math.floor(n.y/cell);
-      for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++){const arr=grid[(cx+dx)+','+(cy+dy)];if(!arr)continue;
-        for(const m of arr){if(m===n)continue;let ddx=n.x-m.x,ddy=n.y-m.y,d2=ddx*ddx+ddy*ddy||0.01;
-          if(d2<9216){const bt=n.type==='ticket'&&m.type==='ticket',bc=n.type!=='ticket'&&m.type!=='ticket';
-            const f=(bt?14:bc?800:130)/d2,d=Math.sqrt(d2);
-            n.vx+=ddx/d*f*alpha;n.vy+=ddy/d*f*alpha;}}}}
-    for(const l of links){let dx=l.b.x-l.a.x,dy=l.b.y-l.a.y,d=Math.sqrt(dx*dx+dy*dy)||0.01,f=(d-l.len)*l.k*alpha,
-      fx=dx/d*f,fy=dy/d*f;l.a.vx+=fx;l.a.vy+=fy;l.b.vx-=fx;l.b.vy-=fy;}
-    hub.x=0;hub.y=0;hub.vx=0;hub.vy=0;  // 허브 원점 고정(전체 중앙 정렬 앵커)
-    for(const n of nodes){if(n===dragNode||n===hub)continue;n.vx+=(0-n.x)*0.004;n.vy+=(0-n.y)*0.004;
-      n.vx*=0.82;n.vy*=0.82;n.x+=n.vx;n.y+=n.vy;}
-    alpha*=0.985;
-  }
-  function draw(){
-    ctx.fillStyle=C.bg;ctx.fillRect(0,0,W,H);ctx.save();ctx.translate(ox,oy);ctx.scale(scale,scale);
-    const dim=hoverCat>=0;
-    ctx.lineWidth=0.7/scale;
-    for(const l of links){
-      // 줌 레벨별 링크 표시: 개요=허브선만, 확대할수록 티켓 링크·백링크 노출
-      if(l.kind===1 && scale<1.0) continue;
-      if(l.kind===2 && scale<1.5) continue;
-      const c=l.kind===2?C.lTk:l.kind===1?C.lCat:C.lHub;
-      if(dim){const ok=(l.a.idx===hoverCat||l.b.c===hoverCat||l.a.c===hoverCat||l.b.idx===hoverCat);if(!ok&&l.kind!==0)continue;}
-      ctx.strokeStyle=c;ctx.beginPath();ctx.moveTo(l.a.x,l.a.y);ctx.lineTo(l.b.x,l.b.y);ctx.stroke();}
-    for(const n of nodes){
-      if(n.type==='ticket'){const on=!dim||n.c===hoverCat;ctx.fillStyle=C.dot;ctx.globalAlpha=on?.8:.1;
-        ctx.beginPath();ctx.arc(n.x,n.y,on&&dim?2.8:2.3,0,6.283);ctx.fill();}
-    }
-    ctx.globalAlpha=1;
-    for(const n of nodes){if(n.type!=='cat')continue;const on=!dim||n.idx===hoverCat;
-      ctx.globalAlpha=on?1:.25;ctx.fillStyle=n.idx===hoverCat?C.hl:C.cat;ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,6.283);ctx.fill();
-      ctx.fillStyle=C.catTx;ctx.font='11.5px sans-serif';ctx.textAlign='center';
-      if(scale>0.55||n.idx===hoverCat)ctx.fillText(n.name+' '+n.count,n.x,n.y-n.r-4);}
-    ctx.globalAlpha=1;
-    ctx.fillStyle=C.hub;ctx.beginPath();ctx.arc(hub.x,hub.y,8,0,6.283);ctx.fill();
-    ctx.fillStyle=C.hubTx;ctx.font='bold 12.5px sans-serif';ctx.textAlign='center';ctx.fillText(hub.name+' '+hub.count,hub.x,hub.y+22);
-    ctx.restore();
-  }
-  function loop(){step();draw();
-    if(alpha>0.02||dragNode){raf=requestAnimationFrame(loop);}else{raf=null;draw();}}
-  function reheat(a){alpha=Math.max(alpha,a);if(!raf)loop();}
 
-  if(tabsEl){tabsEl.innerHTML=tabs.map((t,i)=>`<button data-p="${t}" class="${i===0?'on':''}">${t}</button>`).join('');
+  const G=new ForceGraph(container)
+    .backgroundColor('#f5f6f8')
+    .nodeRelSize(3).nodeVal('val')
+    .nodeColor(n=>n.type==='hub'?COL.hub:n.type==='cat'?COL.cat:COL.dot)
+    .nodeLabel(n=>n.type==='ticket'?'클릭 → 원문':n.name)
+    .nodeCanvasObjectMode(n=>n.type!=='ticket'?'after':undefined)
+    .nodeCanvasObject((n,ctx,k)=>{if(n.type==='ticket')return;
+      const r=Math.sqrt(Math.max(0,n.val))*3;ctx.fillStyle='#2a3038';
+      ctx.font=`${(n.type==='hub'?12.5:11)/k}px -apple-system,sans-serif`;ctx.textAlign='center';ctx.textBaseline='bottom';
+      ctx.fillText(n.name,n.x,n.y-r-3/k);})
+    .linkColor(l=>l.kind===0?'rgba(120,130,150,.35)':l.kind===1?'rgba(150,158,172,.16)':'rgba(160,168,180,.09)')
+    .linkWidth(0.5)
+    .onNodeClick(n=>{if(n.type==='ticket')showPanel(D.tickets[n.ti]);})
+    .graphData(buildData(D.prods[0].name));
+  // 유형 고정 상태에서 티켓만 국소 반발(distanceMax로 껍데기 구 방지) → 클러스터가 느슨하게 퍼짐
+  G.d3Force('charge').strength(n=>n.type==='ticket'?-46:0).distanceMax(95);
+  G.d3Force('link').distance(l=>l.kind===1?24:l.kind===2?16:120).strength(l=>l.kind===1?0.06:l.kind===2?0.02:0.02);
+  if(window.d3&&d3.forceCollide) G.d3Force('collide', d3.forceCollide(n=>n.type==='ticket'?4.5:n.type==='cat'?12:15).strength(0.8));
+  G.onEngineStop(()=>G.zoomToFit(500,55));
+  function size(){G.width(container.clientWidth||innerWidth).height(container.clientHeight||innerHeight);}
+  window.addEventListener('resize',size); size();
+  setTimeout(()=>G.zoomToFit(600,55),1400);
+
+  if(tabsEl){const tabs=D.prods.map(p=>p.name);
+    tabsEl.innerHTML=tabs.map((t,i)=>`<button data-p="${t}" class="${i===0?'on':''}">${t}</button>`).join('');
     tabsEl.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
-      tabsEl.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');active=b.dataset.p;build(active);}));}
+      tabsEl.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+      G.graphData(buildData(b.dataset.p));setTimeout(()=>G.zoomToFit(600,55),1400);}));}
   if(subEl)subEl.textContent=`실 VOC ${D.total.toLocaleString()}건 · 유형 ${D.cats.length}개 · 노드 클릭=원문·드래그`;
-  const EXTENT=420;
-  function fit(){scale=Math.min(W,H)*0.86/(2*EXTENT);ox=W/2;oy=H/2+16;}
-  function resize(){W=innerWidth;H=innerHeight;cv.width=W*DPR;cv.height=H*DPR;cv.style.width=W+'px';cv.style.height=H+'px';ctx.setTransform(DPR,0,0,DPR,0,0);if(!didFit&&W>0){fit();didFit=true;}draw();}
-  function nearest(e,rad){const gx=(e.clientX-ox)/scale,gy=(e.clientY-oy)/scale;let best=rad,hit=null;
-    for(const n of nodes){const d=Math.hypot(gx-n.x,gy-n.y);if(d<best){best=d;hit=n;}}return {hit,gx,gy};}
-  cv.onwheel=e=>{e.preventDefault();const f=e.deltaY<0?1.12:.89,mx=e.clientX-ox,my=e.clientY-oy;ox-=mx*(f-1);oy-=my*(f-1);scale*=f;scale=Math.max(.2,Math.min(6,scale));if(!raf)draw();};
-  cv.onpointerdown=e=>{const {hit}=nearest(e,16);down={x:e.clientX,y:e.clientY};
-    if(hit){dragNode=hit;reheat(0.5);}else{pan={x:e.clientX,y:e.clientY};}};
-  cv.onpointermove=e=>{
-    if(dragNode){dragNode.x=(e.clientX-ox)/scale;dragNode.y=(e.clientY-oy)/scale;dragNode.vx=dragNode.vy=0;reheat(0.3);return;}
-    if(pan){ox+=e.clientX-pan.x;oy+=e.clientY-pan.y;pan={x:e.clientX,y:e.clientY};if(!raf)draw();return;}
-    const {hit}=nearest(e,14);const nc=hit&&hit.type==='cat'?hit.idx:(hit&&hit.type==='ticket'?hit.c:-1);
-    if(nc!==hoverCat){hoverCat=nc;if(!raf)draw();}};
-  window.addEventListener('pointerup',e=>{
-    if(down){const moved=Math.hypot(e.clientX-down.x,e.clientY-down.y);
-      if(moved<5&&dragNode&&dragNode.type==='ticket')showPanel(D.tickets[dragNode.ti]);}
-    dragNode=null;pan=null;down=null;});
-  window.addEventListener('resize',()=>{if(cv.offsetParent!==null){didFit=false;resize();}});
-  build(active); resize();
-  return {resize};
+  return {resize:size, graph:G};
 }
 
 
 
 let vocCtl=null;
-function renderVOC(){ if(vocCtl){vocCtl.resize();return;} vocCtl=setupGraph(document.getElementById('csCanvas'),document.getElementById('cstabs'),document.getElementById('csSub'),VOCDATA); }
+function renderVOC(){ if(vocCtl){vocCtl.resize();return;} vocCtl=setupGraph(document.getElementById('csGraph'),document.getElementById('cstabs'),document.getElementById('csSub'),VOCDATA); }
 
 </script>
 <script>
