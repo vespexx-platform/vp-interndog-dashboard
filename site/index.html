@@ -649,9 +649,10 @@ function setupGraph(container, tabsEl, subEl, D){
   G.d3Force('link').distance(l=>l.kind===1?24:l.kind===2?16:120).strength(l=>l.kind===1?0.06:l.kind===2?0.02:0.02);
   if(window.d3&&d3.forceCollide) G.d3Force('collide', d3.forceCollide(n=>n.type==='ticket'?4.5:n.type==='cat'?12:15).strength(0.8));
   G.onEngineStop(()=>G.zoomToFit(500,55));
-  function size(){G.width(container.clientWidth||innerWidth).height(container.clientHeight||innerHeight);}
+  function size(){const w=container.clientWidth||container.offsetWidth||innerWidth,h=container.clientHeight||container.offsetHeight||innerHeight;if(w>0&&h>0)G.width(w).height(h);}
   window.addEventListener('resize',size); size();
-  setTimeout(()=>G.zoomToFit(600,55),1400);
+  // 초기 컨테이너 크기 0(display 전환 타이밍) 대비 — 여러 번 리사이즈+재프레이밍
+  [150,500,1200,2500].forEach(ms=>setTimeout(()=>{size();G.zoomToFit(500,60);},ms));
 
   if(tabsEl){const tabs=D.prods.map(p=>p.name);
     tabsEl.innerHTML=tabs.map((t,i)=>`<button data-p="${t}" class="${i===0?'on':''}">${t}</button>`).join('');
