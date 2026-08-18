@@ -243,6 +243,17 @@
 
     <section class="view" data-view="inventory">
       <div class="kpis" id="kpisInv"></div>
+      <div class="kpis" id="deplKpis"></div>
+      <div class="card" id="deplSim" style="margin-bottom:12px">
+        <div class="tablehead"><div class="mlabel" style="min-width:0">전환율 올리면? 재고 소진 시뮬레이션</div>
+          <span class="msum">세션 고정 · 전환율만 가정</span></div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span style="font-size:12.5px;color:var(--muted-fg);white-space:nowrap">전환율</span>
+          <input type="range" id="convSlider" style="flex:1;min-width:180px">
+          <b id="convVal" style="font-size:14px;min-width:58px;text-align:right"></b>
+        </div>
+        <div id="deplResult" style="margin-top:12px;font-size:14px;line-height:1.65"></div>
+      </div>
       <div class="card">
         <div class="tablehead"><div class="mlabel" style="min-width:0">FBA 재고 <span class="msum" id="invNote"></span></div></div>
         <div class="tablewrap"><table>
@@ -439,6 +450,41 @@ function renderInventory(){
      <td${i.available<LOW_STOCK?' class="low"':''}>${int(i.available)}</td>
      <td>${nz(i.reserved)}</td><td>${nz(i.inbound)}</td><td>${nz(i.total)}</td></tr>`).join("")
     : `<tr><td colspan="7" style="text-align:center;color:var(--muted-fg)">재고 데이터 없음 (FBA 재고 수집 대기중)</td></tr>`;
+  renderDepletion(avail);
+}
+
+// ---- 재고 소진 예측 + 전환율 시뮬레이션 ----
+function depletionDate(avail, unitsPerDay){
+  if(unitsPerDay<=0.02) return null;
+  const days=Math.round(avail/unitsPerDay);
+  const d=new Date(S[S.length-1].date+"T00:00:00"); d.setDate(d.getDate()+days);
+  return {days, date:d.toISOString().slice(0,10)};
+}
+function renderDepletion(avail){
+  if(!S.length){ document.getElementById("deplKpis").innerHTML=""; document.getElementById("deplSim").style.display="none"; return; }
+  document.getElementById("deplSim").style.display="";
+  const d28=S.slice(-28);
+  const dailyU=avg(d28,"units"), dailySess=avg(d28,"sessions");
+  const curConv=dailySess ? dailyU/dailySess*100 : 0;
+  const cur=depletionDate(avail, dailyU);
+  kpiCards("deplKpis",[
+    ["총 가용 재고", int(avail)+"개", ""],
+    ["최근 28일 일평균 판매", dailyU.toFixed(2)+"개", "세션 "+dailySess.toFixed(0)+"/일"],
+    ["현재 전환율", curConv.toFixed(2)+"%", ""],
+    ["현재 속도 소진 예상", cur?cur.date:"—", cur?"약 "+int(cur.days)+"일 후":"판매 미미"],
+  ]);
+  const sl=document.getElementById("convSlider");
+  sl.min="0.1"; sl.max=String(Math.max(5, Math.ceil(curConv)+1)); sl.step="0.1";
+  sl.value=(curConv>0?curConv:0.2).toFixed(1);
+  function upd(){
+    const c=+sl.value, u=dailySess*c/100, r=depletionDate(avail,u);
+    document.getElementById("convVal").textContent=c.toFixed(1)+"%";
+    const up = curConv>0 ? (c/curConv) : 0;
+    document.getElementById("deplResult").innerHTML = r
+      ? `전환율 <b>${c.toFixed(1)}%</b>${up?` (현재의 ${up.toFixed(1)}배)`:""} 가정 → 일 판매 <b>${u.toFixed(1)}개</b> → 약 <b>${int(r.days)}일</b> 후 <b>${r.date}</b> 소진`
+      : `전환율 ${c.toFixed(1)}% → 판매가 미미해 소진 예측 불가`;
+  }
+  sl.oninput=upd; upd();
 }
 
 // ---- KPI ----
