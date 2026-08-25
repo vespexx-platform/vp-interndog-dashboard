@@ -69,7 +69,36 @@
   .badge{font-size:11.5px;color:var(--muted-fg);background:var(--muted);border:1px solid var(--border);
     padding:6px 10px;border-radius:999px}
   .btn{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;text-decoration:none;
-    padding:6px 13px;border-radius:999px;border:1px solid var(--border);background:var(--card);color:var(--fg)}
+    padding:6px 13px;border-radius:999px;border:1px solid var(--border);background:var(--card);color:var(--fg);cursor:pointer}
+  .btn.ghost:hover{background:var(--muted)}
+  .btn .chev{font-size:10px;color:var(--muted-fg);transition:transform .15s}
+  .more{position:relative}
+  .more-menu{position:absolute;top:calc(100% + 8px);right:0;min-width:190px;background:var(--card);
+    border:1px solid var(--border);border-radius:12px;box-shadow:0 14px 40px rgba(15,23,42,.14);padding:6px;z-index:40}
+  .more-menu[hidden]{display:none}
+  .mi{display:flex;align-items:center;gap:9px;width:100%;text-align:left;font-size:13px;font-weight:500;
+    color:var(--fg);text-decoration:none;background:none;border:none;border-radius:8px;padding:9px 11px;cursor:pointer}
+  .mi:hover{background:var(--muted)}
+  .mi-ic{width:16px;text-align:center;color:var(--muted-fg);font-size:13px;flex:0 0 auto}
+  .mi-sep{height:1px;background:var(--border);margin:5px 8px}
+  /* MCP 연결 모달 */
+  .modal-mask{position:fixed;inset:0;background:rgba(15,23,42,.42);z-index:60;display:flex;align-items:center;justify-content:center;padding:20px}
+  .modal-mask[hidden]{display:none}
+  .modal{background:var(--card);border:1px solid var(--border);border-radius:16px;width:min(620px,100%);
+    max-height:86vh;overflow:auto;box-shadow:0 24px 60px rgba(15,23,42,.28);padding:24px 26px}
+  .modal h2{font-size:18px;margin:0 0 4px}
+  .modal .lead{color:var(--muted-fg);font-size:13px;margin:0 0 18px;line-height:1.6}
+  .modal h4{font-size:12px;font-weight:700;color:var(--muted-fg);letter-spacing:.02em;margin:18px 0 7px}
+  .modal ol{margin:0 0 4px;padding-left:20px;font-size:13px;line-height:1.75;color:var(--fg)}
+  .modal code{background:var(--muted);padding:1px 6px;border-radius:5px;font-size:12px}
+  .codebox{position:relative;background:#0f172a;color:#e2e8f0;border-radius:10px;padding:14px 15px;
+    font:12px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre;overflow:auto}
+  .codebox button{position:absolute;top:9px;right:9px;background:rgba(255,255,255,.12);color:#e2e8f0;
+    border:none;border-radius:6px;padding:4px 9px;font-size:11px;font-weight:600;cursor:pointer}
+  .codebox button:hover{background:rgba(255,255,255,.22)}
+  .modal .close{float:right;background:none;border:none;font-size:20px;color:var(--muted-fg);cursor:pointer;line-height:1;margin:-4px -6px 0 0}
+  .modal .tools{display:grid;grid-template-columns:1fr 1fr;gap:7px 16px;font-size:12.5px;color:var(--fg);margin:2px 0 0}
+  .modal .tools code{font-size:11.5px}
   .seg{display:inline-flex;background:var(--muted);border:1px solid var(--border);border-radius:999px;padding:3px;gap:2px}
   .seg button{border:none;background:transparent;color:var(--muted-fg);font-size:12px;font-weight:600;
     padding:5px 11px;border-radius:999px;cursor:pointer}
@@ -179,7 +208,17 @@
           <button data-g="monthly">월</button><button data-g="quarterly">분기</button>
           <button data-g="yearly">년</button>
         </div>
-        <a class="btn" id="scLink" target="_blank" rel="noopener">셀러센트럴</a>
+        <div class="more" id="more">
+          <button class="btn ghost" id="moreBtn" aria-haspopup="menu" aria-expanded="false">더보기<span class="chev">▾</span></button>
+          <div class="more-menu" id="moreMenu" role="menu" hidden>
+            <a class="mi" id="scLink" target="_blank" rel="noopener" role="menuitem"><span class="mi-ic">↗</span>셀러센트럴</a>
+            <button class="mi" id="miVoc" role="menuitem"><span class="mi-ic">◈</span>CS · VOC 대시보드</button>
+            <button class="mi" id="miMcp" role="menuitem"><span class="mi-ic">⌘</span>MCP 연결</button>
+            <div class="mi-sep"></div>
+            <button class="mi" id="miRefresh" role="menuitem"><span class="mi-ic">⟳</span>데이터 새로고침</button>
+            <button class="mi" id="miLogout" role="menuitem"><span class="mi-ic">⏻</span>로그아웃</button>
+          </div>
+        </div>
       </div>
     </div>
   </header>
@@ -279,6 +318,45 @@
         <div class="canwrap sm"><canvas id="cCumSales"></canvas></div></div>
     </section>
   </main>
+</div>
+
+<div class="modal-mask" id="mcpModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-label="MCP 연결">
+    <button class="close" id="mcpClose" aria-label="닫기">&times;</button>
+    <h2>MCP로 대시보드 데이터 연결</h2>
+    <p class="lead">이 대시보드의 매출·재고·VOC 데이터를 <b>MCP 서버</b>로 노출합니다. Claude(Desktop·Code)에 연결하면 채팅에서 바로 조회·분석할 수 있어요. 데이터는 대시보드 비밀번호로 로컬에서 복호화되며 서버 밖으로 나가지 않습니다.</p>
+
+    <h4>1 · 설치</h4>
+    <div class="codebox"><button data-copy>복사</button>git clone https://github.com/vespexx-platform/vp-interndog-dashboard
+cd vp-interndog-dashboard
+pip install "mcp[cli]" cryptography</div>
+
+    <h4>2 · Claude Code에 등록 (한 줄)</h4>
+    <div class="codebox"><button data-copy>복사</button>claude mcp add vp-interndog \
+  -e DASHBOARD_PASSWORD=대시보드_비밀번호 \
+  -- python3 "$(pwd)/mcp_server.py"</div>
+
+    <h4>또는 · Claude Desktop 설정(JSON)</h4>
+    <div class="codebox"><button data-copy>복사</button>{
+  "mcpServers": {
+    "vp-interndog": {
+      "command": "python3",
+      "args": ["/절대경로/vp-interndog-dashboard/mcp_server.py"],
+      "env": { "DASHBOARD_PASSWORD": "대시보드_비밀번호" }
+    }
+  }
+}</div>
+
+    <h4>제공 도구</h4>
+    <div class="tools">
+      <div><code>get_summary</code> 최근 KPI 요약</div>
+      <div><code>get_sales_series</code> 일·주·월 매출 시계열</div>
+      <div><code>get_products</code> ASIN별 상품 성과</div>
+      <div><code>get_inventory</code> FBA 재고 + 소진 예상</div>
+      <div><code>forecast_depletion</code> 전환율 what-if</div>
+      <div><code>get_voc_summary</code> CS·VOC 유형 집계</div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -566,6 +644,35 @@ document.getElementById("seg").addEventListener("click",e=>{
 document.getElementById("prevM").addEventListener("click",()=>{ if(monthIdx>0){monthIdx--; renderMonth();} });
 document.getElementById("nextM").addEventListener("click",()=>{ if(monthIdx<months.length-1){monthIdx++; renderMonth();} });
 
+// 더보기 드롭다운
+(function(){
+  const wrap=document.getElementById("more"), btn=document.getElementById("moreBtn"), menu=document.getElementById("moreMenu");
+  function close(){ menu.hidden=true; btn.setAttribute("aria-expanded","false"); btn.querySelector(".chev").style.transform=""; }
+  function toggle(){ const open=menu.hidden; menu.hidden=!open; btn.setAttribute("aria-expanded",String(open));
+    btn.querySelector(".chev").style.transform=open?"rotate(180deg)":""; }
+  btn.addEventListener("click",e=>{ e.stopPropagation(); toggle(); });
+  document.addEventListener("click",e=>{ if(!wrap.contains(e.target)) close(); });
+  document.addEventListener("keydown",e=>{ if(e.key==="Escape") close(); });
+  menu.addEventListener("click",e=>{ if(e.target.closest(".mi")) close(); });
+
+  document.getElementById("miVoc").addEventListener("click",()=>{
+    if(typeof VOCDATA!=="undefined" && VOCDATA && typeof __openCS==="function") __openCS();
+    else alert("CS·VOC 데이터가 아직 로드되지 않았습니다.");
+  });
+  document.getElementById("miRefresh").addEventListener("click",()=>location.reload());
+  document.getElementById("miLogout").addEventListener("click",()=>{ try{localStorage.removeItem(SKEY);}catch(_){} location.reload(); });
+
+  // MCP 모달
+  const modal=document.getElementById("mcpModal");
+  document.getElementById("miMcp").addEventListener("click",()=>{ modal.hidden=false; });
+  document.getElementById("mcpClose").addEventListener("click",()=>{ modal.hidden=true; });
+  modal.addEventListener("click",e=>{ if(e.target===modal) modal.hidden=true; });
+  modal.querySelectorAll(".codebox [data-copy]").forEach(b=>b.addEventListener("click",()=>{
+    const txt=b.parentNode.textContent.replace(/^복사|^복사됨/,"").trim();
+    navigator.clipboard?.writeText(txt).then(()=>{ b.textContent="복사됨"; setTimeout(()=>b.textContent="복사",1400); });
+  }));
+})();
+
 // 비밀번호 표시/숨김 토글
 const EYE_ON='<svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>';
 const EYE_OFF='<svg viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
@@ -646,7 +753,7 @@ function showChooser(){
 }
 function __openAmz(){
   document.getElementById("chooser").style.display="none";
-  document.getElementById("shell").style.display="grid";
+  document.getElementById("shell").style.display="block";
   if(!amzRendered){ render(AMZ); amzRendered=true; }
 }
 function __backChooser(){ showChooser(); }
