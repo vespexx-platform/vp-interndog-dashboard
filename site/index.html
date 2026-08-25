@@ -630,7 +630,9 @@ window.__VOC_READY__ = new Promise(res=>{
     <b>CS · VOC</b><span class="s" id="csSub"></span><div id="cstabs"></div></div>
     <div id="csGraph" style="position:absolute;inset:0"></div></div>`);
 })();
+const CS_HIDDEN = true;  // CS·VOC 숨김(비번 후 아마존 대시보드 직행). false로 바꾸면 선택화면 복귀.
 function showChooser(){
+  if(CS_HIDDEN){ __openAmz(); return; }
   document.getElementById("shell").style.display="none";
   document.getElementById("csview").style.display="none";
   const cs=document.getElementById("csChoice");
