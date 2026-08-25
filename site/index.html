@@ -8,24 +8,24 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/force-graph@1"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
 <style>
+  /* frr-dashboard 디자인 시스템 (Self-made-Orange/self-made-design-ops) — TDS 파생 시맨틱 토큰 · Pretendard · 라이트 전용 */
   :root{
-    --bg:#f6f7f8; --sidebar:#ffffff; --card:#ffffff; --fg:#111418; --muted:#f2f3f5;
-    --muted-fg:#6b7280; --info-fg:#c2c7cf; --border:#e5e7eb; --primary:#18181b; --primary-fg:#ffffff;
-    --ring:rgba(0,0,0,.14);
-    --c-sales:#4f46e5; --c-sessions:#f43f5e; --c-conv:#0ea5e9; --c-buybox:#16a34a; --c-pv:#a855f7;
-    --r:12px;
-  }
-  @media (prefers-color-scheme:dark){
-    :root{ --bg:#0a0b0d; --sidebar:#0e0f12; --card:#141517; --fg:#e9eaec; --muted:#1a1b1f;
-      --muted-fg:#9096a0; --info-fg:#4a4e56; --border:#26282d; --primary:#e9eaec; --primary-fg:#0a0b0d;
-      --ring:rgba(255,255,255,.16);
-      --c-sales:#818cf8; --c-sessions:#fb7185; --c-conv:#38bdf8; --c-buybox:#4ade80; --c-pv:#c084fc; }
+    color-scheme: light;
+    --bg:#F5F6F8; --sidebar:#FFFFFF; --card:#FFFFFF; --surface-2:#F4F6F8;
+    --fg:#191F28; --muted:#F4F6F8; --muted-fg:#6B7684; --info-fg:#C4CAD1;
+    --border:#E5E8EB; --chip-active:#E5E8EB;
+    --primary:#3182F6; --primary-fg:#FFFFFF; --link:#1B64DA;
+    --ring:rgba(49,130,246,.32);
+    --c-sales:#3478f6; --c-sessions:#e5575f; --c-conv:#7657d5; --c-buybox:#00a874; --c-pv:#536271;
+    --radius-sm:5px; --r:8px;
+    --shadow-float:0 12px 32px rgba(15,23,42,.16);
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
-  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,"Apple SD Gothic Neo",sans-serif;
-    background:var(--bg); color:var(--fg); -webkit-font-smoothing:antialiased;}
+  body{font-family:"Pretendard Variable",Pretendard,Inter,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif;
+    background:var(--bg); color:var(--fg); -webkit-font-smoothing:antialiased; letter-spacing:0;}
   a{color:inherit}
   svg{display:block}
 
