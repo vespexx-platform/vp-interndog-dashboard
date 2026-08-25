@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vp-interndog-mcp",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "durable_objects": {
+    "bindings": [{ "name": "MCP_OBJECT", "class_name": "VpInterndogMCP" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["VpInterndogMCP"] }]
+  // 시크릿은 커밋하지 말고 wrangler secret 으로 주입:
+  //   wrangler secret put DASHBOARD_PASSWORD
+  //   wrangler secret put MCP_BEARER   (선택: Access 미사용 시 최소 인증)
+}

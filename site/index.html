@@ -35,7 +35,14 @@
   .shell{display:block; min-height:100vh}
   /* 상단 탭 헤더 (family-relocation-research 대시보드 참고) */
   .wrap{width:min(1200px, calc(100% - 40px)); margin:0 auto}
-  .apphead{position:sticky; top:0; z-index:20; background:var(--surface); border-bottom:1px solid var(--border)}
+  .apphead{position:sticky; top:0; z-index:20; background:rgba(255,255,255,.72);
+    -webkit-backdrop-filter:saturate(180%) blur(14px); backdrop-filter:saturate(180%) blur(14px);
+    border-bottom:1px solid var(--border); transition:box-shadow .2s, background .2s}
+  .apphead.scrolled{background:rgba(255,255,255,.82); box-shadow:0 1px 14px rgba(15,23,42,.07)}
+  /* 블러 미지원 브라우저 폴백: 불투명 배경 */
+  @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+    .apphead{background:var(--card)}
+  }
   .header-inner{min-height:56px; display:flex; align-items:center; gap:22px}
   .brand{display:inline-flex; align-items:center; gap:9px; color:var(--fg); text-decoration:none; white-space:nowrap}
   .brand-mark{width:26px;height:26px;border-radius:7px;background:var(--primary);color:var(--primary-fg);
@@ -332,9 +339,21 @@
     <button class="close" id="mcpClose" aria-label="닫기">&times;</button>
     <div class="modal-body">
     <h2>MCP로 대시보드 데이터 연결</h2>
-    <p class="lead">이 대시보드의 매출·재고·VOC 데이터를 <b>MCP 서버</b>로 노출합니다. Claude(Desktop·Code)에 연결하면 채팅에서 바로 조회·분석할 수 있어요. 데이터는 대시보드 비밀번호로 로컬에서 복호화되며 서버 밖으로 나가지 않습니다.</p>
+    <p class="lead">이 대시보드의 매출·재고·VOC 데이터를 <b>MCP</b>로 노출합니다. Claude에 연결하면 채팅에서 바로 조회·분석할 수 있어요. 데이터는 대시보드 비밀번호로 복호화되며 키는 밖으로 나가지 않습니다.</p>
 
-    <h4>1 · 설치</h4>
+    <h4>방법 A · 원격 커넥터 (Claude에 URL만 추가 · 권장)</h4>
+    <p class="lead" style="margin:0 0 8px">Cloudflare Worker로 배포하면 claude.ai·Desktop에서 <b>커스텀 커넥터</b>로 URL만 넣어 붙일 수 있어요. 배포는 <code>mcp-connector/README.md</code> 참고.</p>
+    <div class="codebox"><button data-copy>복사</button>cd mcp-connector && npm install
+npx wrangler login
+npx wrangler secret put DASHBOARD_PASSWORD
+npx wrangler deploy</div>
+    <p class="lead" style="margin:8px 0 0">배포 후 <b>claude.ai → 설정 → 커넥터 → 커스텀 커넥터 추가</b>에 아래 URL을 입력:</p>
+    <div class="codebox"><button data-copy>복사</button>https://vp-interndog-mcp.&lt;서브도메인&gt;.workers.dev/mcp</div>
+    <p class="lead" style="margin:8px 0 0">접근 통제는 <b>Cloudflare Access(Google + @vespexx.com)</b> 권장 — 커넥터가 Access OAuth로 인증.</p>
+
+    <div class="mi-sep" style="margin:18px 0"></div>
+    <h4>방법 B · 로컬 서버 (stdio · 내 PC에서만)</h4>
+    <h4 style="margin-top:9px">1 · 설치</h4>
     <div class="codebox"><button data-copy>복사</button>git clone https://github.com/vespexx-platform/vp-interndog-dashboard
 cd vp-interndog-dashboard
 pip install "mcp[cli]" cryptography</div>
@@ -646,6 +665,11 @@ document.getElementById("nav").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   showTab(b.dataset.tab);
 });
+// 스크롤 시 상단 nav에 그림자(백드롭 블러는 상시)
+(function(){ const h=document.querySelector(".apphead"); if(!h) return;
+  const on=()=>h.classList.toggle("scrolled", (window.scrollY||document.documentElement.scrollTop)>4);
+  addEventListener("scroll", on, {passive:true}); on();
+})();
 document.getElementById("seg").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   curGran=b.dataset.g;
