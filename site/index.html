@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
+<!-- CSP: 복호화된 데이터/비밀번호 유출 방어. connect-src 'none' → CDN이 뚫려도 외부 송신 불가.
+     스크립트/스타일은 자기출처(암호문 data.js·voc.js) + jsdelivr(고정CDN)만 허용. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net data:; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Amazon 판매 대시보드</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
@@ -84,9 +87,10 @@
   /* MCP 연결 모달 */
   .modal-mask{position:fixed;inset:0;background:rgba(15,23,42,.42);z-index:60;display:flex;align-items:center;justify-content:center;padding:20px}
   .modal-mask[hidden]{display:none}
-  .modal{background:var(--card);border:1px solid var(--border);border-radius:16px;width:min(620px,100%);
-    max-height:86vh;overflow:auto;box-shadow:0 24px 60px rgba(15,23,42,.28);padding:24px 26px}
-  .modal h2{font-size:18px;margin:0 0 4px}
+  .modal{position:relative;background:var(--card);border:1px solid var(--border);border-radius:16px;width:min(620px,100%);
+    max-height:86vh;overflow:hidden;box-shadow:0 24px 60px rgba(15,23,42,.28)}
+  .modal-body{overflow:auto;padding:24px 26px;max-height:86vh}
+  .modal h2{font-size:18px;margin:0 0 4px;padding-right:30px}
   .modal .lead{color:var(--muted-fg);font-size:13px;margin:0 0 18px;line-height:1.6}
   .modal h4{font-size:12px;font-weight:700;color:var(--muted-fg);letter-spacing:.02em;margin:18px 0 7px}
   .modal ol{margin:0 0 4px;padding-left:20px;font-size:13px;line-height:1.75;color:var(--fg)}
@@ -96,7 +100,10 @@
   .codebox button{position:absolute;top:9px;right:9px;background:rgba(255,255,255,.12);color:#e2e8f0;
     border:none;border-radius:6px;padding:4px 9px;font-size:11px;font-weight:600;cursor:pointer}
   .codebox button:hover{background:rgba(255,255,255,.22)}
-  .modal .close{float:right;background:none;border:none;font-size:20px;color:var(--muted-fg);cursor:pointer;line-height:1;margin:-4px -6px 0 0}
+  .modal .close{position:absolute;top:12px;right:16px;z-index:3;width:30px;height:30px;display:flex;
+    align-items:center;justify-content:center;background:var(--card);border:none;border-radius:8px;
+    font-size:20px;color:var(--muted-fg);cursor:pointer;line-height:1}
+  .modal .close:hover{background:var(--muted);color:var(--fg)}
   .modal .tools{display:grid;grid-template-columns:1fr 1fr;gap:7px 16px;font-size:12.5px;color:var(--fg);margin:2px 0 0}
   .modal .tools code{font-size:11.5px}
   .seg{display:inline-flex;background:var(--muted);border:1px solid var(--border);border-radius:999px;padding:3px;gap:2px}
@@ -323,6 +330,7 @@
 <div class="modal-mask" id="mcpModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-label="MCP 연결">
     <button class="close" id="mcpClose" aria-label="닫기">&times;</button>
+    <div class="modal-body">
     <h2>MCP로 대시보드 데이터 연결</h2>
     <p class="lead">이 대시보드의 매출·재고·VOC 데이터를 <b>MCP 서버</b>로 노출합니다. Claude(Desktop·Code)에 연결하면 채팅에서 바로 조회·분석할 수 있어요. 데이터는 대시보드 비밀번호로 로컬에서 복호화되며 서버 밖으로 나가지 않습니다.</p>
 
@@ -356,6 +364,7 @@ pip install "mcp[cli]" cryptography</div>
       <div><code>forecast_depletion</code> 전환율 what-if</div>
       <div><code>get_voc_summary</code> CS·VOC 유형 집계</div>
     </div>
+    </div>
   </div>
 </div>
 
@@ -371,6 +380,8 @@ async function decrypt(enc, password){
 const money=n=>"$"+n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 const money0=n=>"$"+n.toLocaleString(undefined,{maximumFractionDigits:0});
 const int=n=>n.toLocaleString();
+// HTML 이스케이프: Amazon 리스팅 유래 문자열(상품명·SKU·ASIN)을 innerHTML에 넣기 전 방어
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const css=k=>getComputedStyle(document.documentElement).getPropertyValue(k).trim();
 
 let S=[], P=[], INV=[], curGran="daily", months=[], monthIdx=0;
@@ -507,7 +518,7 @@ function buildView(v){
 function renderProducts(){
   document.getElementById("prodNote").textContent=`· 누적 기준 · ${P.length}개`;
   document.getElementById("prodBody").innerHTML = P.length ? P.map(p=>
-    `<tr><td>${p.asin}</td><td class="namecell"><div>${p.name||p.sku||"-"}</div></td><td>${money(p.sales)}</td><td>${int(p.units)}</td>
+    `<tr><td>${esc(p.asin)}</td><td class="namecell"><div>${esc(p.name||p.sku||"-")}</div></td><td>${money(p.sales)}</td><td>${int(p.units)}</td>
      <td>${int(p.sessions)}</td><td>${int(p.pageViews)}</td><td>${p.conv.toFixed(2)}</td><td>${p.buybox.toFixed(1)}</td></tr>`).join("")
     : `<tr><td colspan="8" style="text-align:center;color:var(--muted-fg)">상품 데이터 없음</td></tr>`;
 }
@@ -524,7 +535,7 @@ function renderInventory(){
   ]);
   document.getElementById("invNote").textContent = INV.length ? `· ${INV.length} SKU · 가용 적은 순` : "";
   document.getElementById("invBody").innerHTML = INV.length ? INV.map(i=>
-    `<tr><td>${i.sku}</td><td>${i.asin}</td><td class="namecell"><div>${i.name||"-"}</div></td>
+    `<tr><td>${esc(i.sku)}</td><td>${esc(i.asin)}</td><td class="namecell"><div>${esc(i.name||"-")}</div></td>
      <td${i.available<LOW_STOCK?' class="low"':''}>${int(i.available)}</td>
      <td>${nz(i.reserved)}</td><td>${nz(i.inbound)}</td><td>${nz(i.total)}</td></tr>`).join("")
     : `<tr><td colspan="7" style="text-align:center;color:var(--muted-fg)">재고 데이터 없음 (FBA 재고 수집 대기중)</td></tr>`;
