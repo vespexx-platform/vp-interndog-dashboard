@@ -29,7 +29,21 @@
   a{color:inherit}
   svg{display:block}
 
-  .shell{display:grid; grid-template-columns:236px 1fr; min-height:100vh}
+  .shell{display:block; min-height:100vh}
+  /* 상단 탭 헤더 (family-relocation-research 대시보드 참고) */
+  .wrap{width:min(1200px, calc(100% - 40px)); margin:0 auto}
+  .apphead{position:sticky; top:0; z-index:20; background:var(--surface); border-bottom:1px solid var(--border)}
+  .header-inner{min-height:56px; display:flex; align-items:center; gap:22px}
+  .brand{display:inline-flex; align-items:center; gap:9px; color:var(--fg); text-decoration:none; white-space:nowrap}
+  .brand-mark{width:26px;height:26px;border-radius:7px;background:var(--primary);color:var(--primary-fg);
+    display:grid;place-items:center;font-weight:800;font-size:14px}
+  .brand-name{font-size:16px;font-weight:750;letter-spacing:0}
+  .top-nav{display:flex;align-items:center;gap:2px;margin-right:auto;flex-wrap:wrap}
+  .top-nav button{border:none;background:transparent;color:var(--muted-fg);font:inherit;font-size:14px;font-weight:600;
+    padding:8px 13px;border-radius:8px;cursor:pointer;white-space:nowrap;transition:color .15s,background .15s}
+  .top-nav button:hover{color:var(--fg);background:var(--muted)}
+  .top-nav button.active{color:var(--primary);background:rgba(49,130,246,.09)}
+  .head-right{display:flex;align-items:center;gap:10px;flex:0 0 auto}
   .sidebar{background:var(--sidebar); border-right:1px solid var(--border); padding:18px 14px;
     display:flex; flex-direction:column; gap:6px; position:sticky; top:0; height:100vh}
   .brand{display:flex; align-items:center; gap:10px; padding:6px 8px 16px}
@@ -46,7 +60,8 @@
     stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
   .side-foot{margin-top:auto;padding:10px 8px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted-fg)}
 
-  .main{padding:22px 26px 60px; max-width:1180px}
+  .main{padding:22px 0 60px}
+  .session-left{color:var(--muted-fg);font-size:12px;white-space:nowrap}
   .topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
   .topbar h1{margin:0;font-size:19px;letter-spacing:-.3px}
   .topbar .sub{color:var(--muted-fg);font-size:12.5px;margin-top:3px}
@@ -150,37 +165,15 @@
 </div>
 
 <div class="shell" id="shell">
-  <aside class="sidebar">
-    <div class="brand"><div class="logo">a</div><b>Amazon 대시보드</b></div>
-    <div class="navlabel">메뉴</div>
-    <div class="nav" id="nav">
-      <button data-view="overview" class="active">
-        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
-        개요</button>
-      <button data-view="traffic">
-        <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-        트래픽 · 전환</button>
-      <button data-view="products">
-        <svg viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-        상품(ASIN)</button>
-      <button data-view="inventory">
-        <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-        재고</button>
-      <button data-view="daily">
-        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        날짜별 데이터</button>
-      <button data-view="insights">
-        <svg viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.5.4.8 1 .8 1.6V17h6.4v-.7c0-.6.3-1.2.8-1.6A7 7 0 0 0 12 2z"/></svg>
-        인사이트</button>
-    </div>
-    <div class="side-foot" id="foot"></div>
-  </aside>
-
-  <main class="main">
-    <div class="topbar">
-      <div><h1 id="viewTitle">개요</h1><div class="sub" id="sub"></div></div>
-      <div class="actions">
-        <span class="badge" id="updated"></span>
+  <header class="apphead">
+    <div class="wrap header-inner">
+      <a class="brand" href="./"><span class="brand-mark">a</span><span class="brand-name">Amazon 대시보드</span></a>
+      <nav class="top-nav" id="nav">
+        <button data-tab="overview" class="active">개요</button>
+        <button data-tab="catalog">상품 · 재고</button>
+        <button data-tab="analysis">분석</button>
+      </nav>
+      <div class="head-right">
         <div class="seg" id="seg">
           <button data-g="daily" class="on">일</button><button data-g="weekly">주</button>
           <button data-g="monthly">월</button><button data-g="quarterly">분기</button>
@@ -188,6 +181,13 @@
         </div>
         <a class="btn" id="scLink" target="_blank" rel="noopener">셀러센트럴</a>
       </div>
+    </div>
+  </header>
+
+  <main class="wrap main">
+    <div class="topbar">
+      <div><h1 id="viewTitle">개요</h1><div class="sub" id="sub"></div></div>
+      <div class="actions"><span class="badge" id="updated"></span><span class="session-left" id="foot"></span></div>
     </div>
 
     <section class="view active" data-view="overview">
@@ -533,24 +533,29 @@ function render(data){
   document.getElementById("sub").textContent=
     `${data.tz} · ${mmdd(S[0].date)}~${mmdd(S[S.length-1].date)} · ${S.length}일 · Amazon US`;
   document.getElementById("updated").textContent="업데이트 "+data.generated;
-  document.getElementById("foot").innerHTML=`최근 갱신<br>${data.generated}`;
+  document.getElementById("foot").textContent=`최근 갱신 ${data.generated}`;
   document.getElementById("scLink").href="https://sellercentral.amazon.com/business-reports";
   months=[...new Set(S.map(r=>r.date.slice(0,7)))].sort();
   monthIdx=months.length-1;
   injectInfoIcons();
   renderKPIs();
-  buildView("overview");
+  showTab("overview");
 }
 
 // ---- 이벤트 ----
+// 탭 통합: 하나의 상단 탭이 여러 섹션(뷰)을 묶어 보여줌 (핵심정보 우선)
+const TABS={overview:["overview","traffic"], catalog:["products","inventory"], analysis:["daily","insights"]};
+const TAB_TITLE={overview:"개요", catalog:"상품 · 재고", analysis:"분석"};
+function showTab(tab){
+  const views=TABS[tab]||["overview"];
+  document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("active",x.dataset.tab===tab));
+  document.querySelectorAll(".view").forEach(x=>x.classList.toggle("active", views.includes(x.dataset.view)));
+  document.getElementById("viewTitle").textContent=TAB_TITLE[tab]||tab;
+  setTimeout(()=>views.forEach(v=>buildView(v)), 0);
+}
 document.getElementById("nav").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
-  const v=b.dataset.view;
-  document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("active",x===b));
-  document.querySelectorAll(".view").forEach(x=>x.classList.toggle("active",x.dataset.view===v));
-  document.getElementById("viewTitle").textContent=b.textContent.trim();
-  // rAF는 탭이 백그라운드면 fire되지 않아 뷰가 비어 보일 수 있음 → setTimeout 사용
-  setTimeout(()=>buildView(v), 0);
+  showTab(b.dataset.tab);
 });
 document.getElementById("seg").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
