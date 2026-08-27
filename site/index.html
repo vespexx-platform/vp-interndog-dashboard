@@ -470,12 +470,12 @@ const CHARTS={
     options:{plugins:{legend:{display:false}},scales:{x:xs(),
       y:{grid:grid(),suggestedMin:Math.max(0,Math.min(...a.map(b=>b.buybox))-2),suggestedMax:100,ticks:{color:css("--muted-fg"),callback:v=>v+"%"}}}}}),
   cTraffic:(a)=>({data:{labels:a.map(b=>b.key),datasets:[
-    {type:"line",label:"페이지뷰",data:a.map(b=>b.pageViews),borderColor:css("--c-pv"),backgroundColor:css("--c-pv")+"80",fill:true,tension:.3,pointRadius:pt(curGran)},
-    {type:"line",label:"세션",data:a.map(b=>b.sessions),borderColor:css("--c-sessions"),tension:.3,pointRadius:pt(curGran)}]},
+    {type:"line",label:"페이지뷰",data:a.map(b=>b.pageViews),borderColor:css("--c-pv"),backgroundColor:css("--c-pv")+"80",fill:true,tension:.3,pointRadius:pt(curGran),order:1},
+    {type:"line",label:"세션",data:a.map(b=>b.sessions),borderColor:css("--c-sessions"),tension:.3,pointRadius:pt(curGran),order:2}]},
     options:{scales:{x:xs(),y:{grid:grid(),ticks:{color:css("--muted-fg")}}}}}),
   cPvConv:(a)=>({data:{labels:a.map(b=>b.key),datasets:[
-    {type:"bar",label:"페이지뷰",data:a.map(b=>b.pageViews),backgroundColor:css("--c-pv")+"80",borderRadius:4,yAxisID:"y"},
-    {type:"line",label:"전환(판매수량)",data:a.map(b=>b.units),borderColor:css("--c-buybox"),tension:.3,pointRadius:pt(curGran),yAxisID:"y1"}]},
+    {type:"bar",label:"페이지뷰",data:a.map(b=>b.pageViews),backgroundColor:css("--c-pv")+"80",borderRadius:4,yAxisID:"y",order:1},
+    {type:"line",label:"전환(판매수량)",data:a.map(b=>b.units),borderColor:css("--c-buybox"),tension:.3,pointRadius:pt(curGran),yAxisID:"y1",order:2}]},
     options:{scales:{x:xs(),y:{grid:grid(),ticks:{color:css("--muted-fg")}},
       y1:{position:"right",grid:{display:false},beginAtZero:true,ticks:{color:css("--muted-fg"),precision:0}}}}}),
   cSesConv:(a)=>({data:{labels:a.map(b=>b.key),datasets:[
